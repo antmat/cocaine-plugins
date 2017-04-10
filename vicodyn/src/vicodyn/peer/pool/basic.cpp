@@ -47,7 +47,7 @@ auto choose_random_if(Iterator begin, Iterator end, Predicate p) -> Iterator {
 
 
 /// Debug purpose function for printing current remotes in pool
-auto print_remotes(const basic_t::remote_map_t& peers) -> std::string {
+auto print_remotes(const basic_t::peers_t& peers) -> std::string {
     std::ostringstream ss;
     ss << std::boolalpha << "[";
     for(auto peer_pair: peers) {
@@ -102,19 +102,19 @@ auto basic_t::invoke(const io::aux::decoded_message_t& incoming_message,
 }
 
 auto basic_t::choose_peer() -> std::pair<std::string, std::shared_ptr<peer_t>> {
-    return remotes.apply([&](remote_map_t& remote_map) {
+    return remotes.apply([&](peers_t& remote_map) {
         COCAINE_LOG_DEBUG(logger, "choosing peer, remotes size: {}", remote_map.size());
         if(remote_map.empty()) {
             // this can happen when the proxy is shutting down
             throw error_t(error::service_not_available, "no active backend found");
         }
         // First we try to choose connected peer
-        auto it = choose_random_if(remote_map.begin(), remote_map.end(), [](const remote_map_t::value_type& p){
+        auto it = choose_random_if(remote_map.begin(), remote_map.end(), [](const peers_t::value_type& p){
             return p.second.connected();
         });
         if(it == remote_map.end()) {
             // No connected peer found - grab any and wait for connection to succeed
-            it = choose_random_if(remote_map.begin(), remote_map.end(), [](const remote_map_t::value_type& p) {
+            it = choose_random_if(remote_map.begin(), remote_map.end(), [](const peers_t::value_type& p) {
                 return static_cast<bool>(p.second.peer);
             });
             if(it == remote_map.end()) {
@@ -134,7 +134,7 @@ auto basic_t::on_peer_error(const std::string& uuid, std::future<void> future) -
         COCAINE_LOG_WARNING(logger, "peer {} errored: {}", uuid, e.what());
     }
 
-    remotes.apply([&](remote_map_t& remote_map){
+    remotes.apply([&](peers_t& remote_map){
         auto& remote = remote_map[uuid];
         remote.freezed_till = std::chrono::system_clock::now() + freeze_time;
         auto peer = remote.peer;
@@ -147,9 +147,9 @@ auto basic_t::on_peer_error(const std::string& uuid, std::future<void> future) -
     });
 }
 
-auto basic_t::connect_peer(std::shared_ptr<peer_t> peer, remote_map_t& remote_map) -> void {
+auto basic_t::connect_peer(std::shared_ptr<peer_t> peer, peers_t& remote_map) -> void {
     COCAINE_LOG_DEBUG(logger,"connecting peer");
-    auto comp = [&](const remote_map_t::value_type& lhs, const remote_map_t::value_type& rhs){
+    auto comp = [&](const peers_t::value_type& lhs, const peers_t::value_type& rhs){
         if(lhs.second.active() != rhs.second.active()) {
             return lhs.second.active();
         }
@@ -185,22 +185,22 @@ auto basic_t::rebalance_peers() -> void {
             rebalance_peers();
         }
     });
-    remotes.apply([&](remote_map_t& remote_map){
-        auto peer_counter = [](const remote_map_t& r_map) {
-            return static_cast<size_t>(std::count_if(r_map.begin(), r_map.end(), [](const remote_map_t::value_type& p) {
+    remotes.apply([&](peers_t& remote_map){
+        auto peer_counter = [](const peers_t& r_map) {
+            return static_cast<size_t>(std::count_if(r_map.begin(), r_map.end(), [](const peers_t::value_type& p) {
                 return static_cast<bool>(p.second.peer);
             }));
         };
 
-        auto available_counter = [](const remote_map_t& r_map) -> size_t {
-            return std::count_if(r_map.begin(), r_map.end(), [](const remote_map_t::value_type& p) {
+        auto available_counter = [](const peers_t& r_map) -> size_t {
+            return std::count_if(r_map.begin(), r_map.end(), [](const peers_t::value_type& p) {
                 return p.second.active();
             });
         };
 
         // first evict old peer from pool
         if(peer_counter(remote_map) >= pool_size) {
-            auto comp = [&](const remote_map_t::value_type& lhs, const remote_map_t::value_type& rhs) {
+            auto comp = [&](const peers_t::value_type& lhs, const peers_t::value_type& rhs) {
                 if(!!lhs.second.peer == !!rhs.second.peer) {
                     return lhs.second.last_used < rhs.second.last_used;
                 }

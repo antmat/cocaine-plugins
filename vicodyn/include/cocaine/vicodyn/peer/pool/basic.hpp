@@ -14,24 +14,9 @@ namespace pool {
 class basic_t : public api::peer::pool_t
 {
 public:
-    struct remote_t {
-        std::string uuid;
-        std::vector<asio::ip::tcp::endpoint> endpoints;
-        bool local;
-        std::chrono::system_clock::time_point freezed_till;
-        std::chrono::system_clock::time_point last_used;
-        std::shared_ptr<peer_t> peer;
 
-        auto active() const -> bool {
-            return std::chrono::system_clock::now() >= freezed_till;
-        }
 
-        auto connected() const -> bool {
-            return peer && peer->connected();
-        }
-    };
-
-    typedef std::map<std::string, remote_t> remote_map_t;
+    typedef std::map<std::string, remote_t> peers_t;
 
     basic_t(context_t& _context, asio::io_service& _io_loop, const std::string& service_name, const dynamic_t&);
 
@@ -50,7 +35,7 @@ public:
 
 private:
     auto choose_peer() -> std::pair<std::string, std::shared_ptr<peer_t>>;
-    auto connect_peer(std::shared_ptr<peer_t> peer, remote_map_t& remote_map) -> void;
+    auto connect_peer(std::shared_ptr<peer_t> peer, peers_t& remote_map) -> void;
     auto rebalance_peers() -> void;
     auto on_peer_error(const std::string& uuid, std::future<void> future) -> void;
 
@@ -65,7 +50,7 @@ private:
     asio::io_service& io_loop;
     asio::deadline_timer rebalance_timer;
 
-    synchronized<remote_map_t> remotes;
+    synchronized<peers_t> remotes;
 };
 
 } // namespace pool
