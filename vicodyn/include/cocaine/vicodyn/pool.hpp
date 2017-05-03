@@ -24,14 +24,11 @@ public:
 
     auto size() -> size_t;
 
-    auto on_peer_disconnection(std::shared_ptr<peer_t> peer) -> void;
-
-    auto on_peer_error(const std::shared_ptr<peer_t>& peer, std::future<void> future) -> void;
-
 private:
     auto rebalance_peers() -> void;
-    auto on_peer_state(std::future<peer_t::state_result_t>) -> void;
+    auto on_peer_state(peer_t::state_result_t state_result) -> void;
 
+    std::string service_name;
     std::shared_ptr<dispatch<io::context_tag>> signal_dispatcher;
     size_t pool_size;
     size_t retry_count;

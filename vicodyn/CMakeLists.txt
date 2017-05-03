@@ -22,6 +22,7 @@ TARGET_LINK_LIBRARIES(vicodyn
         blackhole
         cocaine-core
         cocaine-io-util
+        metrics
         ${Boost_LIBRARIES})
 
 SET_TARGET_PROPERTIES(vicodyn PROPERTIES

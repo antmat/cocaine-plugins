@@ -20,19 +20,20 @@ public:
     };
 
     struct state_result_t {
+        std::error_code ec;
         std::shared_ptr<peer_t> peer;
         state_t from;
         state_t to;
     };
 
-    using state_callback_t = std::function<void(std::future<state_result_t>)>;
+    using state_callback_t = std::function<void(state_result_t)>;
     using endpoints_t = std::vector<asio::ip::tcp::endpoint>;
     using clock_t = std::chrono::system_clock;
     using message_t = io::aux::decoded_message_t;
 
     ~peer_t();
 
-    peer_t(context_t& context, asio::io_service& loop, endpoints_t endpoints, std::string uuid, bool local);
+    peer_t(context_t& context, std::string service_name, asio::io_service& loop, endpoints_t endpoints, std::string uuid, bool local);
 
     auto invoke(const message_t& message, const io::graph_node_t& protocol, stream_ptr_t backward_stream) -> stream_ptr_t;
 
@@ -62,6 +63,7 @@ private:
     auto switch_state(state_t expected_current_state, state_t desired_state) -> void;
 
     context_t& context;
+    std::string service_name;
     asio::io_service& loop;
     std::unique_ptr<queue::invocation_t> queue;
     state_callback_t state_cb;
@@ -93,7 +95,9 @@ public:
     auto add(std::string uuid, std::shared_ptr<peer_t> peer) -> bool;
 
     /// Returns nullptr if specified uuid was not found
-    auto remove(std::string uuid) -> std::shared_ptr<peer_t>;
+    auto remove(const std::string& uuid) -> std::shared_ptr<peer_t>;
+
+    auto migrate(peer_t::state_t from, peer_t::state_t to, const std::string uuid) -> void;
 
     auto size() const -> size_t;
 private:

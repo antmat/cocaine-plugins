@@ -23,6 +23,7 @@ private:
     auto choose_peer(const peers_t& peers) -> std::shared_ptr<peer_t>;
 
     dynamic_t conf;
+    std::unique_ptr<logging::logger_t> logger;
 };
 
 } // namespace balancer

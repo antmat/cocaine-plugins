@@ -17,7 +17,8 @@
 #include <asio/connect.hpp>
 
 #include <blackhole/logger.hpp>
-#include <cocaine/vicodyn/peer.hpp>
+
+#include <metrics/registry.hpp>
 
 namespace cocaine {
 namespace vicodyn {
@@ -25,8 +26,9 @@ namespace vicodyn {
 peer_t::~peer_t(){
 }
 
-peer_t::peer_t(context_t& context, asio::io_service& loop, endpoints_t endpoints, std::string uuid, bool local) :
+peer_t::peer_t(context_t& context, std::string service_name, asio::io_service& loop, endpoints_t endpoints, std::string uuid, bool local) :
     context(context),
+    service_name(std::move(service_name)),
     loop(loop),
     queue(new queue::invocation_t),
     logger(context.log(format("vicodyn_peer/{}", uuid))),
@@ -40,7 +42,7 @@ auto peer_t::switch_state(state_t expected_current_state, state_t desired_state)
     d.state = desired_state;
     auto self = shared_from_this();
     loop.post([=](){
-        self->state_cb(make_ready_future(state_result_t{shared_from_this(), expected_current_state, desired_state}));
+        self->state_cb(state_result_t{{}, shared_from_this(), expected_current_state, desired_state});
     });
 }
 
@@ -56,14 +58,12 @@ auto peer_t::connect() -> void {
     asio::async_connect(*socket, begin, end, [=](const std::error_code& ec, endpoints_t::const_iterator endpoint_it) {
         auto self = weak_self.lock();
         if(!self){
-            VICODYN_DEBUG("peer disappeared during connection");
             return;
         }
-        VICODYN_DEBUG("peer connected");
         if(ec) {
             COCAINE_LOG_ERROR(logger, "could not connect to {} - {}({})", *endpoint_it, ec.message(), ec.value());
             if(endpoint_it == end) {
-                state_cb(make_exceptional_future<state_result_t>(ec));
+                state_cb(state_result_t{ec, shared_from_this(), state_t::connecting, state_t::connecting});
             }
             return;
         }
@@ -73,11 +73,12 @@ auto peer_t::connect() -> void {
             auto session = context.engine().attach(std::move(ptr), nullptr);
             // queue will be in consistent state if exception is thrown
             // it is safe to reconnect peer to different endpoint
-            queue->attach(session_t::shared(std::move(session)));
+            auto counter = context.metrics_hub().counter<std::uint64_t>(format("vicodyn.{}.connections.counter", service_name));
+            queue->attach(session_t::shared(std::move(session), std::move(counter)));
             switch_state(state_t::connecting, state_t::connected);
         } catch(const std::exception& e) {
             COCAINE_LOG_WARNING(logger, "failed to attach session to queue: {}", e.what());
-            state_cb(make_exceptional_future<state_result_t>());
+            state_cb(state_result_t{ec, shared_from_this(), state_t::connecting, state_t::connecting});
         }
     });
 }
@@ -159,7 +160,7 @@ auto peers_t::add(std::string uuid, std::shared_ptr<peer_t> peer) -> bool {
 }
 
 /// Returns nullptr if specified uuid was not found
-auto peers_t::remove(std::string uuid) -> std::shared_ptr<peer_t> {
+auto peers_t::remove(const std::string& uuid) -> std::shared_ptr<peer_t> {
     for(auto& group: peer_groups) {
         auto it = group.second.find(uuid);
         if(it != group.second.end()) {
@@ -170,6 +171,16 @@ auto peers_t::remove(std::string uuid) -> std::shared_ptr<peer_t> {
     }
     return nullptr;
 
+}
+
+auto peers_t::migrate(peer_t::state_t from, peer_t::state_t to, const std::string uuid) -> void {
+    auto& group = peer_groups.at(from);
+    auto it = group.find(uuid);
+    if(it == group.end()) {
+        throw error_t("could not find peer {} in state {}", uuid, from);
+    }
+    peer_groups.at(to)[uuid] = it->second;
+    group.erase(it);
 }
 
 auto peers_t::size() const -> size_t {

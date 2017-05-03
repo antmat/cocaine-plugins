@@ -27,9 +27,9 @@ proxy_t::proxy_t(context_t& context,
     m_protocol(_protocol),
     m_version(_version),
     // TODO: Note here we use acceptor io_loop.
-    pool(context, *io_loop, _name, dynamic_t())
+    pool(context, *io_loop, _name, dynamic_t::empty_object)
 {
-    VICODYN_DEBUG("create proxy");
+    COCAINE_LOG_DEBUG(logger, "created proxy for {}", _name);
 }
 
 boost::optional<io::dispatch_ptr_t>
