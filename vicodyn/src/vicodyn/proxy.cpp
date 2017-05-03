@@ -36,8 +36,7 @@ boost::optional<io::dispatch_ptr_t>
 proxy_t::process(const io::decoder_t::message_type& incoming_message, const io::upstream_ptr_t& raw_backward_stream) {
     auto slot_id = incoming_message.type();
     auto protocol_it = m_protocol.find(slot_id);
-    COCAINE_LOG_DEBUG(logger, "graph has {} handles", m_protocol.size());
-    COCAINE_LOG_DEBUG(logger, "graph handle is {}", m_protocol.begin()->first);
+    COCAINE_LOG_DEBUG(logger, "graph has {} handles, handle is {}", m_protocol.size(), m_protocol.begin()->first);
     if(protocol_it == m_protocol.end()) {
         auto msg = cocaine::format("could not find event with id {} in protocol for {}", slot_id, name());
         COCAINE_LOG_ERROR(logger, msg);

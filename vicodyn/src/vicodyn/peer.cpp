@@ -19,6 +19,7 @@
 #include <blackhole/logger.hpp>
 
 #include <metrics/registry.hpp>
+#include <cocaine/vicodyn/peer.hpp>
 
 namespace cocaine {
 namespace vicodyn {
@@ -124,6 +125,10 @@ auto peer_t::freezed_till() const -> clock_t::time_point {
 
 auto peer_t::last_used() const -> clock_t::time_point {
     return d.last_used;
+}
+
+auto peer_t::endpoints() const -> const std::vector<asio::ip::tcp::endpoint>& {
+    return d.endpoints;
 }
 
 auto peer_t::invoke(const io::decoder_t::message_type& incoming_message,

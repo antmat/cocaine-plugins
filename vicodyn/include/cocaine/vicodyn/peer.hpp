@@ -59,6 +59,8 @@ public:
 
     auto last_used() const -> clock_t::time_point;
 
+    auto endpoints() const -> const std::vector<asio::ip::tcp::endpoint>&;
+
 private:
     auto switch_state(state_t expected_current_state, state_t desired_state) -> void;
 
