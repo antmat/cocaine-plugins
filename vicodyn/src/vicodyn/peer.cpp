@@ -71,6 +71,7 @@ auto peer_t::connect() -> void {
         try {
             auto ptr = std::make_unique<asio::ip::tcp::socket>(std::move(*socket));
             //TODO: what can we do with shutdown and empty engines in context?
+
             auto session = context.engine().attach(std::move(ptr), nullptr);
             // queue will be in consistent state if exception is thrown
             // it is safe to reconnect peer to different endpoint

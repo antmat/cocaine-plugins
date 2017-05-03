@@ -32,13 +32,7 @@ public:
 private:
     struct operation_t {
         // msgpack object
-        msgpack::object data;
-
-        // msgpack zone where all pointers are located
-        std::unique_ptr<msgpack::zone> zone;
-
-        // pack-unpack buffer which stores raw data. msgpack objects point to this buffer
-        io::aux::encoded_message_t encoded_message;
+        const msgpack::object* data;
 
         // message type
         uint64_t event_id;
@@ -54,6 +48,13 @@ private:
 
         // send queue to queue all further send invocations
         stream_ptr_t forward_stream;
+
+        // msgpack zone where all pointers are located
+        std::unique_ptr<msgpack::zone> zone;
+
+        // pack-unpack buffer which stores raw data. msgpack objects point to this buffer
+        boost::optional<io::aux::encoded_message_t> encoded_message;
+
     };
 
     auto execute(std::shared_ptr<session_t> session, const operation_t& op) -> void;
