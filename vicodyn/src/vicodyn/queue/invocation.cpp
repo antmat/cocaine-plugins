@@ -12,7 +12,7 @@ namespace cocaine {
 namespace vicodyn {
 namespace queue {
 
-auto invocation_t::absorb(invocation_t&& other) -> void {
+auto invocation_t::absorb(invocation_t& other) -> void {
     m_session.apply([&](std::shared_ptr<session_t>& session) {
         if(!session) {
             for(auto& op: other.m_operations) {
@@ -29,6 +29,7 @@ auto invocation_t::absorb(invocation_t&& other) -> void {
                     for(auto& op: other.m_operations) {
                         m_operations.push_back(std::move(op));
                     }
+                    other.m_operations.clear();
                     break;
                 }
             }
@@ -94,6 +95,14 @@ auto invocation_t::attach(std::shared_ptr<session_t> new_session) -> void {
 
     // safe to clean outside lock as it is not used anymore after session is set
     m_operations.clear();
+}
+
+auto invocation_t::disconnect() -> void {
+    /// This one is performed in a gracefull way
+    /// just resetting pointer guarantee all invocation in progress will be completed
+    m_session.apply([&](std::shared_ptr<session_t>& session){
+        session = nullptr;
+    });
 }
 
 auto invocation_t::execute(std::shared_ptr<session_t> session, const operation_t& operation) -> void{

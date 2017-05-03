@@ -5,6 +5,7 @@
 #include "cocaine/vicodyn/stream.hpp"
 
 #include <cocaine/context.hpp>
+#include <cocaine/dynamic.hpp>
 #include <cocaine/errors.hpp>
 #include <cocaine/format.hpp>
 #include <cocaine/logging.hpp>
@@ -26,7 +27,7 @@ proxy_t::proxy_t(context_t& context,
     m_protocol(_protocol),
     m_version(_version),
     // TODO: Note here we use acceptor io_loop.
-    pool(api::peer::pool(context, *io_loop, "basic", _name))
+    pool(context, *io_loop, _name, dynamic_t())
 {
     VICODYN_DEBUG("create proxy");
 }
@@ -58,7 +59,7 @@ proxy_t::process(const io::decoder_t::message_type& incoming_message, const io::
     }
     stream_ptr_t backward_stream = std::make_shared<stream_t>(stream_t::direction_t::backward);
     backward_stream->attach(std::move(raw_backward_stream));
-    auto forward_stream = pool->invoke(incoming_message, *backward_protocol, std::move(backward_stream));
+    auto forward_stream = pool.invoke(incoming_message, *backward_protocol, std::move(backward_stream));
 
     // terminal transition
     if(forward_protocol->empty()) {

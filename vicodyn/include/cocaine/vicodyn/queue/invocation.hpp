@@ -21,9 +21,11 @@ public:
     auto append(const msgpack::object& message, uint64_t event_id, hpack::header_storage_t headers,
                 const io::graph_node_t& protocol, stream_ptr_t backward_stream) -> stream_ptr_t;
 
-    auto absorb(invocation_t&& queue) -> void;
+    auto absorb(invocation_t& queue) -> void;
 
     auto attach(std::shared_ptr<session_t> session) -> void;
+
+    auto disconnect() -> void;
 
     auto connected() -> bool;
 
