@@ -18,7 +18,11 @@ struct display<std::chrono::time_point<Clock, Duration>> {
     auto
     apply(std::ostream& stream, const value_t& value) -> std::ostream& {
         std::time_t time = Clock::to_time_t(value);
-        stream << std::put_time(std::localtime(&time), "%F %T");
+        struct tm time_data = tm();
+        gmtime_r(&time, &time_data);
+        std::array<char, 128> buffer;
+        strftime(buffer.data(), buffer.size(), "%F %T", &time_data);
+        stream << buffer.data();
         return stream;
     }
 };

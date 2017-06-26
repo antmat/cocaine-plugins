@@ -53,7 +53,7 @@ private:
         std::unique_ptr<msgpack::zone> zone;
 
         // pack-unpack buffer which stores raw data. msgpack objects point to this buffer
-        boost::optional<io::aux::encoded_message_t> encoded_message;
+        io::aux::encoded_message_t encoded_message;
 
     };
 

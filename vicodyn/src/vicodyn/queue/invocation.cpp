@@ -45,7 +45,7 @@ auto invocation_t::append(const msgpack::object& message,
 {
     auto forward_stream = std::make_shared<stream_t>(stream_t::direction_t::forward);
 
-    operation_t operation = {};
+    operation_t operation = operation_t();
     operation.event_id = event_id;
     operation.headers = std::move(headers);
     operation.forward_stream = forward_stream;
@@ -55,8 +55,7 @@ auto invocation_t::append(const msgpack::object& message,
     m_session.apply([&](std::shared_ptr<session_t>& session) mutable {
         if(!session) {
             operation.zone = std::make_unique<msgpack::zone>();
-            operation.encoded_message = io::aux::encoded_message_t();
-            msgpack::packer<io::aux::encoded_message_t> packer(operation.encoded_message.get());
+            msgpack::packer<io::aux::encoded_message_t> packer(operation.encoded_message);
             packer << message;
         } else {
             operation.data = &message;
@@ -74,7 +73,7 @@ auto invocation_t::attach(std::shared_ptr<session_t> new_session) -> void {
             try {
                 msgpack::object object;
                 size_t offset;
-                msgpack::unpack(it->encoded_message->data(), it->encoded_message->size(), &offset, it->zone.get(), &object);
+                msgpack::unpack(it->encoded_message.data(), it->encoded_message.size(), &offset, it->zone.get(), &object);
                 it->data = &object;
                 execute(session, *it);
                 it = m_operations.erase(it);
