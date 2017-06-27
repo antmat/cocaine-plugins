@@ -20,7 +20,10 @@
 #include <cocaine/forwards.hpp>
 #include <cocaine/locked_ptr.hpp>
 
+#include <boost/optional/optional.hpp>
+
 #include <set>
+
 namespace cocaine { namespace cluster {
 
 class unicorn_cluster_t:
@@ -78,30 +81,20 @@ public:
     };
 
     class subscriber_t {
-        unicorn_cluster_t& parent;
-        timer_t timer;
-
         struct locator_subscription_t {
             std::vector<asio::ip::tcp::endpoint> endpoints;
-            boost::optional<auto_scope_t> scope;
+            boost::optional<api::auto_scope_t> scope;
         };
 
         using subscriptions_t = std::map<std::string, locator_subscription_t>;
+
         synchronized<subscriptions_t> subscriptions;
-
-//    public:
-//        using node_scopes_t = std::map<std::string, auto_scope_t>;
-//
-    private:
         unicorn_cluster_t& parent;
-
-        auto_scope_t children_scope;
-//
-//        node_scopes_t node_scopes;
+        timer_t timer;
+        boost::optional<api::auto_scope_t> children_scope;
 
     public:
         subscriber_t(unicorn_cluster_t& parent);
-
         auto subscribe() -> void;
 
     private:
@@ -114,56 +107,13 @@ public:
     unicorn_cluster_t(context_t& context, interface& locator, mode_t mode, const std::string& name, const dynamic_t& args);
 
 private:
-    std::pair<size_t, api::unicorn_scope_ptr&>
-    scope(std::map<size_t, api::unicorn_scope_ptr>& _scopes);
-
-    void
-    drop_scope(size_t);
-
-    void
-    announce();
-
-    void
-    subscribe();
-
-    void
-    on_announce_timer(const std::error_code& ec);
-
-    void
-    on_subscribe_timer(const std::error_code& ec);
-
-    void
-    on_node_list_change(size_t scope_id, std::future<response::children_subscribe> new_list);
-
-    void
-    on_node_fetch(size_t scope_id, const std::string& uuid, std::future<response::get> node_endpoints);
-
-    void
-    on_announce_set(std::future<response::create> future);
-
-    void
-    on_announce_checked(std::future<response::subscribe> future);
-
     std::shared_ptr<logging::logger_t> log;
     cfg_t config;
     cocaine::context_t& context;
     cluster_t::interface& locator;
+    api::unicorn_ptr unicorn;
     announcer_t announcer;
     subscriber_t subscriber;
-    std::vector<asio::ip::tcp::endpoint> endpoints;
-    asio::deadline_timer announce_timer;
-    asio::deadline_timer subscribe_timer;
-
-    api::unicorn_ptr unicorn;
-    api::unicorn_scope_ptr subscribe_scope;
-    api::unicorn_scope_ptr announce_scope;
-    api::unicorn_scope_ptr check_scope;
-//    std::atomic<size_t> scope_counter;
-    using scopes_t = std::map<std::string, api::unicorn_scope_ptr>;
-    synchronized<scopes_t> scopes;
-
-    typedef std::map<std::string, std::vector<asio::ip::tcp::endpoint>> locator_endpoints_t;
-    synchronized<locator_endpoints_t> registered_locators;
 };
 
 }}
