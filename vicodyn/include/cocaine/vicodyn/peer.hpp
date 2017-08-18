@@ -13,7 +13,6 @@ class peer_t : public std::enable_shared_from_this<peer_t> {
 public:
     using app_streaming_tag = io::stream_of<std::string>::tag;
 
-    using state_callback_t = std::function<void(state_result_t)>;
     using endpoints_t = std::vector<asio::ip::tcp::endpoint>;
 
     ~peer_t();

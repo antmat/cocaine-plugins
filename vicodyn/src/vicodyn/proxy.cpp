@@ -47,8 +47,8 @@ class forward_dispatch_t : public dispatch<app_tag>, public std::enable_shared_f
 
         data_t(upstream<app_tag> backward_stream):
             backward_stream(std::move(backward_stream)),
-            buffering_enabled(true),
             choke_sent(false),
+            buffering_enabled(true),
             retry_counter(0)
         {}
     };
@@ -141,28 +141,7 @@ public:
         });
     }
 
-    auto retry() -> void {
-        d.apply([&](data_t& d){
-            d.retry_counter++;
-            if(!d.buffering_enabled) {
-                throw error_t("buffering is already disabled - response chunk was sent");
-            }
-            if(d.retry_counter > proxy.balancer->retry_count()) {
-                throw error_t("maximum number of retries reached");
-            }
-            peer = proxy.choose_peer(d.enqueue_headers, d.enqueue_frame);
-            auto dispatch_name = format("{}/{}/streaming/backward", d.proxy.name(), d.enqueue_frame);
-            auto backward_dispatch = std::make_shared<backward_dispatch_t>(dispatch_name, d.backward_stream, shared_from_this());
-            d.forward_stream = d.peer->open_stream(std::move(backward_dispatch));
-            d.forward_stream->send<io::node::enqueue>(d.enqueue_headers, d.proxy.app_name, d.enqueue_frame);
-            for(size_t i = 0; i < d.chunks.size(); i++) {
-                d.forward_stream->send<protocol::chunk>(d.chunk_headers[i], d.chunks[i]);
-            }
-            if(d.choke_sent) {
-                d.forward_stream->send<protocol::choke>(d.choke_headers);
-            }
-        });
-    }
+    auto retry() -> void;
 
     auto on_error(std::error_code ec, const std::string& msg) -> void {
         return proxy.balancer->on_error(ec, msg);
@@ -185,8 +164,7 @@ public:
     ):
         dispatch(name),
         backward_stream(std::move(back_stream)),
-        forward_dispatch(std::move(f_dispatch)),
-        finished(false)
+        forward_dispatch(std::move(f_dispatch))
     {
         on<protocol::chunk>().execute([this](const hpack::headers_t& headers, std::string chunk) mutable {
             forward_dispatch->disable_buffering();
@@ -230,11 +208,34 @@ public:
     }
 };
 
+auto forward_dispatch_t::retry() -> void {
+    d.apply([&](data_t& d){
+        d.retry_counter++;
+        if(!d.buffering_enabled) {
+            throw error_t("buffering is already disabled - response chunk was sent");
+        }
+        if(d.retry_counter > proxy.balancer->retry_count()) {
+            throw error_t("maximum number of retries reached");
+        }
+        peer = proxy.choose_peer(d.enqueue_headers, d.enqueue_frame);
+        auto dispatch_name = format("{}/{}/streaming/backward", proxy.name(), d.enqueue_frame);
+        auto backward_dispatch = std::make_shared<backward_dispatch_t>(dispatch_name, d.backward_stream, shared_from_this());
+        d.forward_stream = peer->open_stream(std::move(backward_dispatch));
+        d.forward_stream->send<io::node::enqueue>(d.enqueue_headers, proxy.app_name, d.enqueue_frame);
+        for(size_t i = 0; i < d.chunks.size(); i++) {
+            d.forward_stream->send<protocol::chunk>(d.chunk_headers[i], d.chunks[i]);
+        }
+        if(d.choke_sent) {
+            d.forward_stream->send<protocol::choke>(d.choke_headers);
+        }
+    });
+}
+
 auto proxy_t::make_balancer(const dynamic_t& args) -> api::vicodyn::balancer_ptr {
     auto balancer_conf = args.as_object().at("balancer", dynamic_t::empty_object);
     auto name = balancer_conf.as_object().at("type", "simple").as_string();
     auto balancer_args = balancer_conf.as_object().at("args", dynamic_t::empty_object).as_object();
-    return context.repository().get<api::vicodyn::balancer_t>(name, context, executor.asio(), app_name, args);
+    return context.repository().get<api::vicodyn::balancer_t>(name, context, executor.asio(), app_name, balancer_args);
 }
 
 proxy_t::proxy_t(context_t& context, const std::string& name, const dynamic_t& args) :
@@ -249,8 +250,7 @@ proxy_t::proxy_t(context_t& context, const std::string& name, const dynamic_t& a
         try {
             auto peer = choose_peer(headers, event);
             auto dispatch_name = format("{}/{}/streaming/forward", this->name(), event);
-            auto forward_dispatch = std::make_shared<forward_dispatch_t>(*this, dispatch_name, app_name,
-                                                                         backward_stream, peer);
+            auto forward_dispatch = std::make_shared<forward_dispatch_t>(*this, dispatch_name, backward_stream, peer);
 
             dispatch_name = format("{}/{}/streaming/backward", this->name(), event);
             auto backward_dispatch = std::make_shared<backward_dispatch_t>(dispatch_name, backward_stream,
@@ -261,10 +261,10 @@ proxy_t::proxy_t(context_t& context, const std::string& name, const dynamic_t& a
             return result_t(forward_dispatch);
         } catch (const std::system_error& e) {
             backward_stream.send<app_protocol::error>(e.code(), e.what());
-            auto dispatch = std::make_shared<enqueue_slot_t::dispatch_type>(format("{}/{}/empty", app_name, event_name));
-            dispatch->on<protocol::error>([this](std::error_code, std::string){});
-            dispatch->on<protocol::chunk>([this](std::string){});
-            dispatch->on<protocol::choke>([this](){});
+            auto dispatch = std::make_shared<slot_t::dispatch_type>(format("{}/{}/empty", app_name, event));
+            dispatch->on<app_protocol::error>([this](std::error_code, std::string){});
+            dispatch->on<app_protocol::chunk>([this](std::string){});
+            dispatch->on<app_protocol::choke>([this](){});
             return result_t(dispatch);
         }
     });

@@ -7,7 +7,7 @@
 #include <cocaine/executor/asio.hpp>
 #include <cocaine/forwards.hpp>
 #include <cocaine/rpc/dispatch.hpp>
-#include <../../node/include/cocaine/idl/node.hpp>
+#include <cocaine/idl/node.hpp>
 
 #include <asio/ip/tcp.hpp>
 

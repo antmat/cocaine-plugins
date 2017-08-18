@@ -1,4 +1,4 @@
-#include "coacine/vicodyn/balancer/simple.hpp"
+#include "cocaine/vicodyn/balancer/simple.hpp"
 
 namespace cocaine {
 namespace vicodyn {
@@ -10,7 +10,7 @@ simple_t::simple_t(context_t& ctx, asio::io_service& loop, const std::string& ap
 {}
 
 auto simple_t::choose_peer(synchronized<proxy_t::mapping_t>& mapping, const hpack::headers_t& /*headers*/,
-                           const std::string& /*event*/) -> std::shared_ptr<cocaine::vicodyn::peer_t> override
+                           const std::string& /*event*/) -> std::shared_ptr<cocaine::vicodyn::peer_t>
 {
     return mapping.apply([&](proxy_t::mapping_t& mapping) {
         auto sz = mapping.peers_with_app.size();
@@ -33,15 +33,15 @@ auto simple_t::choose_peer(synchronized<proxy_t::mapping_t>& mapping, const hpac
     });
 }
 
-auto simple_t::retry_count() -> size_t override {
+auto simple_t::retry_count() -> size_t {
     return args.as_object().at("retry_count", 10u).as_uint();
 }
 
-auto simple_t::on_error(std::error_code, const std::string&) -> void override {
+auto simple_t::on_error(std::error_code, const std::string&) -> void {
     // no op
 }
 
-auto simple_t::is_recoverable(std::error_code ec, std::shared_ptr<peer_t> peer) -> bool override {
+auto simple_t::is_recoverable(std::error_code ec, std::shared_ptr<peer_t> /*peer*/) -> bool {
     bool queue_is_full = (ec.category() == error::overseer_category() && ec.value() == error::queue_is_full);
     bool unavailable = (ec.category() == error::node_category() && ec.value() == error::not_running);
     return queue_is_full || unavailable;

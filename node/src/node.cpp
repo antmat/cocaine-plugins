@@ -213,7 +213,6 @@ node_t::node_t(context_t& context, asio::io_service& asio, const std::string& na
 
 
     using enqueue_slot_t = io::basic_slot<io::node::enqueue>;
-    using app_protocol = io::protocol<io::stream_of<std::string>::tag>::scope;
     on<io::node::enqueue>(
         [&](const hpack::headers_t& headers, enqueue_slot_t::tuple_type&& args, enqueue_slot_t::upstream_type&& upstream)
             -> enqueue_slot_t::result_type
@@ -223,9 +222,9 @@ node_t::node_t(context_t& context, asio::io_service& asio, const std::string& na
             using app_protocol = io::protocol<io::stream_of<std::string>::tag>::scope;
             auto empty = [&](){
                 auto dispatch = std::make_shared<enqueue_slot_t::dispatch_type>(format("{}/{}/empty", app_name, event_name));
-                dispatch->on<protocol::error>([this](std::error_code, std::string){});
-                dispatch->on<protocol::chunk>([this](std::string){});
-                dispatch->on<protocol::choke>([this](){});
+                dispatch->on<app_protocol::error>([this](std::error_code, std::string){});
+                dispatch->on<app_protocol::chunk>([this](std::string){});
+                dispatch->on<app_protocol::choke>([this](){});
                 return dispatch;
             };
             return apps.apply([&](std::map<std::string, std::shared_ptr<node::app_t>>& apps){
