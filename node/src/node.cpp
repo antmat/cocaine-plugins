@@ -69,34 +69,99 @@ class control_slot_t:
         typedef io::event_traits<io::node::control_app>::dispatch_type dispatch_type;
         typedef io::protocol<dispatch_type>::scope protocol;
 
-        std::shared_ptr<overseer_t> overseer;
+        using backward_protocol = io::aux::protocol_impl<typename io::event_traits<io::node::control_app>::upstream_type>::type;
 
-        dispatch_t(const std::string& name, control_slot_t* p):
-            super(format("controlling/{}", name))
-        {
-            overseer = p->parent.overseer(name);
-            if (overseer == nullptr) {
-                throw cocaine::error_t("app is not available");
-            }
+        node_t& node;
+        std::string app_name;
+        streamed<bool> upstream;
 
-            on<protocol::chunk>([&](int size) {
-                if (size >= 0) {
-                    overseer->control_population(boost::make_optional(std::size_t(size)));
-                } else {
-                    overseer->control_population(boost::none);
+        class catcher_t {
+            streamed<bool> upstream;
+        public:
+            explicit
+            catcher_t(streamed<bool> upstream) :
+                upstream(upstream)
+            {}
+
+            template<typename Event, typename F, typename... Args>
+            auto
+            operator()(F fn, Event, const hpack::headers_t& headers, Args&&... args) -> typename result_of<F>::type {
+                try {
+                    return fn(headers, std::forward<Args>(args)...);
+                } catch(const std::system_error& e) {
+                    upstream.abort(e.code(), e.what());
+                } catch(const std::exception& e) {
+                    upstream.abort(error::uncaught_error, e.what());
                 }
-            });
-            on<protocol::error>([&](std::error_code, const std::string&) {
-                overseer->control_population(boost::none);
-            });
-            on<protocol::choke>([&]() {
-                overseer->control_population(boost::none);
-            });
+                if(io::is_recursed<Event>::value) {
+                    return boost::none;
+                } else {
+                    using R = typename result_of<F>::type;
+                    return R(nullptr);
+                }
+            }
+        };
+
+
+        dispatch_t(const std::string& name, node_t& node, streamed<bool> _upstream):
+            super(format("controlling/{}", name)),
+            node(node),
+            app_name(name),
+            upstream(_upstream)
+        {
+            auto ovs = node.overseer(name);
+            if(!ovs) {
+                upstream.abort(error::not_running, "app is not running");
+            }
+            catcher_t catcher(upstream);
+
+            using chunk = protocol::chunk;
+            using choke = protocol::choke;
+            using error = protocol::error;
+            using chunk_slot = io::basic_slot<chunk>;
+            using choke_slot = io::basic_slot<choke>;
+            using error_slot = io::basic_slot<error>;
+            on<chunk>().with_middleware(catcher).execute(
+                [&](const hpack::headers_t&, chunk_slot::tuple_type&& args, chunk_slot::upstream_type&&) -> chunk_slot::result_type {
+                    auto size = std::get<0>(args);
+                    if (size >= 0) {
+                        control_population(boost::make_optional(std::size_t(size)));
+                    } else {
+                        control_population(boost::none);
+                    }
+                    upstream.write(true);
+                    return boost::none;
+                }
+            );
+            on<error>().with_middleware(catcher).execute(
+                [&](const hpack::headers_t&, error_slot::tuple_type&&, error_slot::upstream_type&&) -> error_slot::result_type {
+                    control_population(boost::none);
+                    upstream.close();
+                    return error_slot::result_type(nullptr);
+                }
+            );
+            on<choke>().with_middleware(catcher).execute(
+                [&](const hpack::headers_t&, choke_slot::tuple_type&&, choke_slot::upstream_type&&) -> choke_slot::result_type {
+                    control_population(boost::none);
+                    upstream.close();
+                    return choke_slot::result_type(nullptr);
+                }
+            );
+        }
+
+        void
+        control_population(boost::optional<std::size_t> population) {
+            auto ovs = node.overseer(app_name);
+            if(!ovs) {
+                upstream.abort(error::node_errors::not_running, "app is not running");
+            } else {
+                ovs->control_population(population);
+            }
         }
 
         void
         discard(const std::error_code&) override {
-            overseer->control_population(boost::none);
+            control_population(boost::none);
         }
     };
 
@@ -116,10 +181,12 @@ public:
     }
 
     boost::optional<result_type>
-    operator()(const meta_type&, tuple_type&& args, upstream_type&&) {
-        // TODO: Call middlewares manually. Catch exceptions, send error manually, everything manually.
+    operator()(const meta_type&, tuple_type&& args, upstream_type&& upstream) {
+        streamed<bool> up;
+        up.attach(upstream);
+
         const auto dispatch = tuple::invoke(std::move(args), [&](const std::string& name) -> result_type {
-            return std::make_shared<dispatch_t>(name, this);
+            return std::make_shared<dispatch_t>(name, parent, std::move(up));
         });
 
         return boost::make_optional(dispatch);

@@ -156,6 +156,8 @@ struct control_app {
         means rolling back to the default logic. */
         int
     >::tag dispatch_type;
+
+    typedef stream_of<bool>::tag upstream_type;
 };
 
 struct info {
