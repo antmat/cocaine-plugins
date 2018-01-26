@@ -1,3 +1,9 @@
+cocaine-plugins (0.12.14.47) unstable; urgency=low
+
+  * Fixed: catch exception in control slot.
+
+ -- Anton Matveenko <antmat@me.com>  Fri, 26 Jan 2018 19:04:45 +0300
+
 cocaine-plugins (0.12.14.46) unstable; urgency=low
 
   * Fixed: UB in app stop.
