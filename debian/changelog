@@ -1,3 +1,9 @@
+cocaine-plugins (0.12.14.46) unstable; urgency=low
+
+  * Fixed: UB in app stop.
+
+ -- Anton Matveenko <antmat@me.com>  Fri, 26 Jan 2018 16:54:45 +0300
+
 cocaine-plugins (0.12.14.45) unstable; urgency=low
 
   * Changed: allow zero workers for controlling.
