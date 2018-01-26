@@ -385,11 +385,15 @@ node_t::pause_app(const std::string& name) -> deferred<void> {
                 cocaine::format("app '{}' is not running", name));
         }
 
-        auto app = apps.erase(it)->second;
-        std::async(std::launch::async, [=]() mutable {
+        auto app = it->second;
+        apps.erase(it);
+
+        // NOTE: we rely that app is being moved out here,
+        // so the dtor of app will take place strictly in the other thread.
+        std::async(std::launch::async, [](std::shared_ptr<node::app_t> app, deferred<void> d) {
             app.reset();
             d.close();
-        });
+        }, std::move(app), d);
     });
 
     return d;
