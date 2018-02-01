@@ -181,7 +181,7 @@ extract_permissions(const S& subjects, P& perms) -> std::size_t {
 enabled_t::enabled_t(context_t& context, const std::string& service, const dynamic_t& args) :
     log(context.log(cocaine::format("authorization/{}/unicorn", service))),
     backend(api::unicorn(context, args.as_object().at("backend", "core").as_string())),
-    executor(std::make_unique<executor::owning_asio_t>()),
+    executor(std::make_unique<executor::owning_asio_t>(OWNING_ASIO_INIT)),
     counter(0)
 {}
 

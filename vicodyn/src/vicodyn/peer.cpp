@@ -159,7 +159,8 @@ auto peer_t::x_cocaine_cluster() const -> const std::string& {
 
 peers_t::peers_t(context_t& context):
     context(context),
-    logger(context.log("vicodyn/peers_t"))
+    logger(context.log("vicodyn/peers_t")),
+    executor(OWNING_ASIO_INIT)
 {}
 
 auto peers_t::register_peer(const std::string& uuid, const endpoints_t& endpoints, dynamic_t::object_t extra)

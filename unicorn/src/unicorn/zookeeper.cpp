@@ -612,9 +612,9 @@ auto zookeeper_t::run_command(Callback callback, Args&& ...args) -> scope_ptr {
 }
 
 zookeeper_t::zookeeper_t(cocaine::context_t& _context, const std::string& _name, const dynamic_t& args) :
-    api::v15::unicorn_t(_context, name, args),
+    api::v15::unicorn_t(_context, _name, args),
     context(_context),
-    executor(new cocaine::executor::owning_asio_t()),
+    executor(new cocaine::executor::owning_asio_t(OWNING_ASIO_INIT)),
     name(_name),
     log(context.log(cocaine::format("unicorn/{}", name))),
     zk_session(),

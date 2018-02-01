@@ -79,7 +79,7 @@ cfg_t::connection_string() const {
 zookeeper::connection_t::connection_t(const cfg_t& _cfg, const session_t& _session) :
     cfg(_cfg),
     session(_session),
-    executor(new cocaine::executor::owning_asio_t()),
+    executor(new cocaine::executor::owning_asio_t(OWNING_ASIO_INIT)),
     id_counter(1)
 {
     if(!cfg.prefix.empty() && cfg.prefix[0] != '/') {

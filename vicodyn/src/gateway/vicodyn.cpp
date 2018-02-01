@@ -83,6 +83,7 @@ vicodyn_t::vicodyn_t(context_t& _context, const std::string& _local_uuid, const 
                      const dynamic_t::object_t& locator_extra) :
     gateway_t(_context, _local_uuid, name, args, locator_extra),
     context(_context),
+    executor(OWNING_ASIO_INIT),
     locator_extra(locator_extra),
     wrapped_gateway(),
     peers(context),

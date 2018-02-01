@@ -87,7 +87,7 @@ public:
         unicorn(std::move(unicorn)),
         scope(),
         subscope(),
-        executor(),
+        executor(OWNING_ASIO_INIT),
         timer(executor.asio()),
         log(std::move(log))
     {}
