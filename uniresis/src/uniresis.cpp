@@ -58,7 +58,7 @@ auto resolve(const std::string& hostname) -> std::vector<tcp::endpoint> {
 } // namespace
 
 /// A task that will try to notify about resources information on the machine.
-class uniresis_t::updater_t : public std::enable_shared_from_this<uniresis_t::updater_t> {
+class uniresis_t::updater_t {
     std::string path;
     std::string hostname;
     std::vector<tcp::endpoint> endpoints;
@@ -69,7 +69,7 @@ class uniresis_t::updater_t : public std::enable_shared_from_this<uniresis_t::up
     api::unicorn_scope_ptr subscope;
     executor::owning_asio_t executor;
     asio::deadline_timer timer;
-    std::shared_ptr<logging::logger_t> log;
+    logging::logger_t& log;
 
 public:
     updater_t(std::string path,
@@ -78,7 +78,7 @@ public:
               dynamic_t::object_t extra,
               uniresis::resources_t resources,
               std::shared_ptr<api::unicorn_t> unicorn,
-              std::shared_ptr<logging::logger_t> log) :
+              logging::logger_t& log) :
         path(std::move(path)),
         hostname(std::move(hostname)),
         endpoints(std::move(endpoints)),
@@ -89,14 +89,24 @@ public:
         subscope(),
         executor(),
         timer(executor.asio()),
-        log(std::move(log))
+        log(log)
     {}
+
+    ~updater_t() {
+        if(scope) {
+            scope->close();
+        }
+        if (subscope) {
+            subscope->close();
+        }
+        timer.cancel();
+    }
 
     auto
     notify() -> void {
         COCAINE_LOG_DEBUG(log, "schedule resource notification on `{}` ...", path);
         scope = unicorn->create(
-            std::bind(&updater_t::on_create, shared_from_this(), ph::_1),
+            std::bind(&updater_t::on_create, this, ph::_1),
             path,
             make_value(),
             true,
@@ -127,11 +137,9 @@ private:
 
     auto
     notify_later() -> void {
-        auto self = shared_from_this();
-
         COCAINE_LOG_DEBUG(log, "schedule resource notification after {} sec ...", 1);
         timer.expires_from_now(boost::posix_time::seconds(1));
-        timer.async_wait([&, self](std::error_code ec) {
+        timer.async_wait([=](std::error_code ec) {
             if (ec) {
                 return;
             }
@@ -165,7 +173,7 @@ private:
     subscribe() -> void {
         COCAINE_LOG_DEBUG(log, "schedule resource node subscription on `{}` ...", path);
         scope = unicorn->subscribe(
-            std::bind(&updater_t::on_subscribe, shared_from_this(), ph::_1),
+            std::bind(&updater_t::on_subscribe, this, ph::_1),
             path
         );
     }
@@ -238,15 +246,15 @@ uniresis_t::uniresis_t(context_t& context, asio::io_service& loop, const std::st
         );
     }
     auto unicorn = api::unicorn(context, args.as_object().at("unicorn", defaults::unicorn_name).as_string());
-    updater = std::make_shared<updater_t>(
+    updater.reset(new updater_t(
         std::move(path),
         std::move(hostname),
         std::move(endpoints),
         std::move(extra),
         resources,
         std::move(unicorn),
-        log
-    );
+        *log
+    ));
     updater->notify();
 
     on<io::uniresis::cpu_count>([&] {

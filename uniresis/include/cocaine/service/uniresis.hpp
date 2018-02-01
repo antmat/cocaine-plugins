@@ -16,8 +16,8 @@ class uniresis_t : public api::service_t, public dispatch<io::uniresis_tag> {
 
     std::string uuid;
     uniresis::resources_t resources;
-    std::shared_ptr<updater_t> updater;
-    std::shared_ptr<logging::logger_t> log;
+    std::unique_ptr<updater_t> updater;
+    std::unique_ptr<logging::logger_t> log;
 
 public:
     uniresis_t(context_t& context, asio::io_service& loop, const std::string& name, const dynamic_t& args);

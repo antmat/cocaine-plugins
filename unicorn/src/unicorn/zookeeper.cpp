@@ -64,8 +64,6 @@ auto throw_watch_event(const watch_reply_t& reply) -> void {
                   event_to_string(reply.type), state_to_string(reply.state), reply.path);
 }
 
-}
-
 class scope_t: public api::unicorn_scope_t {
 public:
     // This recursive mutex seems to be best solution to prevent dead locks in bad designed unicorn api.
@@ -73,13 +71,28 @@ public:
     synchronized<bool, std::recursive_mutex> closed;
 
     auto close() -> void override {
-        closed.apply([&](bool& closed){
+        closed.apply([&](bool& closed) {
             closed = true;
         });
     }
 
     virtual
     auto on_abort() -> void {}
+};
+
+class scope_wrapper_t : public api::unicorn_scope_t {
+    std::shared_ptr<scope_t> wrapped;
+public:
+    scope_wrapper_t(std::shared_ptr<scope_t> wrapped) :
+        wrapped(std::move(wrapped)) { }
+
+    ~scope_wrapper_t() {
+        wrapped->close();
+    }
+
+    auto close() -> void override {
+        wrapped->close();
+    }
 };
 
 struct abortable_t {
@@ -108,7 +121,7 @@ private:
     auto on_reply(Reply reply) -> void = 0;
 };
 
-template <class T, class... Args>
+template<class T, class... Args>
 class safe: public std::enable_shared_from_this<safe<T, Args...>>, public action<Args>... {
     std::shared_ptr<scope_t> _scope;
     future_callback<T> wrapped;
@@ -121,18 +134,16 @@ public:
     }
 
     safe(future_callback<T> wrapped) :
-            _scope(std::make_shared<scope_t>()),
-            wrapped(std::move(wrapped))
-    {}
+        _scope(std::make_shared<scope_t>()),
+        wrapped(std::move(wrapped)) { }
 
     safe(std::shared_ptr<scope_t> scope, future_callback<T> wrapped) :
-            _scope(std::move(scope)),
-            wrapped(std::move(wrapped))
-    {}
+        _scope(std::move(scope)),
+        wrapped(std::move(wrapped)) { }
 
     template<class Result>
     auto satisfy(Result&& result) -> void {
-        _scope->closed.apply([&](bool& closed){
+        _scope->closed.apply([&](bool& closed) {
             if(!closed) {
                 wrapped(make_ready_future<T>(std::forward<Result>(result)));
             }
@@ -141,7 +152,7 @@ public:
 
     virtual
     auto abort_with_current_exception() -> void override {
-        _scope->closed.apply([&](bool& closed){
+        _scope->closed.apply([&](bool& closed) {
             _scope->on_abort();
             if(!closed) {
                 wrapped(make_exceptional_future<T>());
@@ -153,25 +164,26 @@ public:
     auto abort(std::exception_ptr eptr) -> void {
         try {
             std::rethrow_exception(eptr);
-        } catch(...){
+        } catch(...) {
             abort_with_current_exception();
         }
     }
 };
 
-class zookeeper_t::put_t: public safe<response::put, put_reply_t, get_reply_t>
-{
+}
+
+class zookeeper_t::put_t: public safe<response::put, put_reply_t, get_reply_t> {
     zookeeper_t& parent;
     path_t path;
     value_t value;
     version_t version;
 public:
-    put_t(callback::put wrapped, zookeeper_t& parent, path_t path, value_t value, version_t version):
-            safe(std::move(wrapped)),
-            parent(parent),
-            path(std::move(path)),
-            value(std::move(value)),
-            version(version)
+    put_t(callback::put wrapped, zookeeper_t& parent, path_t path, value_t value, version_t version) :
+        safe(std::move(wrapped)),
+        parent(parent),
+        path(std::move(path)),
+        value(std::move(value)),
+        version(version)
     {}
 
     auto run() -> void {
@@ -193,14 +205,13 @@ private:
     }
 
     auto on_reply(get_reply_t reply) -> void override {
-        if (reply.rc) {
+        if(reply.rc) {
             throw error_t(map_zoo_error(reply.rc), "failure during getting new node value - {}", zerror(reply.rc));
         } else {
             satisfy(std::make_tuple(false, versioned_value_t(unserialize(reply.data), reply.stat.version)));
         }
     }
 };
-
 
 class zookeeper_t::get_t: public safe<versioned_value_t, get_reply_t> {
     zookeeper_t& parent;
@@ -608,7 +619,7 @@ auto zookeeper_t::run_command(Callback callback, Args&& ...args) -> scope_ptr {
             action->abort(eptr);
         });
     }
-    return action->scope();
+    return std::make_shared<scope_wrapper_t>(action->scope());
 }
 
 zookeeper_t::zookeeper_t(cocaine::context_t& _context, const std::string& _name, const dynamic_t& args) :
