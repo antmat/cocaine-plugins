@@ -43,7 +43,7 @@ auto control_t::start() -> void {
 auto control_t::terminate(const std::error_code& ec) -> void {
     BOOST_ASSERT(ec);
 
-    COCAINE_LOG_DEBUG(slave->log, "sending terminate message");
+    COCAINE_LOG_INFO(slave->log, "sending terminate message");
 
     try {
         stream = stream.send<io::worker::terminate>(ec.value(), ec.message());

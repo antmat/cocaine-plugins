@@ -30,7 +30,7 @@ terminate_t::~terminate_t() {
     control->cancel();
     session->detach(asio::error::operation_aborted);
 
-    COCAINE_LOG_DEBUG(slave->log, "state '{}' has been destroyed", name());
+    COCAINE_LOG_INFO(slave->log, "state '{}' has been destroyed", name());
 }
 
 auto terminate_t::terminating() const noexcept -> bool {
@@ -60,7 +60,7 @@ auto terminate_t::terminate(const std::error_code& ec) -> void {
 }
 
 auto terminate_t::start(unsigned long timeout, const std::error_code& ec) -> void {
-    COCAINE_LOG_DEBUG(slave->log, "slave is terminating, timeout: {} ms", timeout);
+    COCAINE_LOG_INFO(slave->log, "slave is terminating, timeout: {} ms", timeout);
 
     timer.expires_from_now(boost::posix_time::milliseconds(static_cast<std::int64_t>(timeout)));
     timer.async_wait(std::bind(&terminate_t::on_timeout, shared_from_this(), ph::_1));

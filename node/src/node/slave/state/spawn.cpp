@@ -73,7 +73,7 @@ auto spawn_t::terminate(const std::error_code& ec) -> void {
 }
 
 auto spawn_t::spawn(api::authentication_t::token_t token, unsigned long timeout) -> void {
-    COCAINE_LOG_DEBUG(slave->log, "slave is spawning using '{}', timeout: {} ms",
+    COCAINE_LOG_INFO(slave->log, "slave is spawning using '{}', timeout: {} ms",
                       slave->manifest.executable, timeout);
 
     COCAINE_LOG_DEBUG(slave->log, "locating the Locator endpoint list");
@@ -178,7 +178,7 @@ spawn_t::on_spawn(std::chrono::high_resolution_clock::time_point start) {
         return;
     }
 
-    COCAINE_LOG_DEBUG(slave->log, "slave has been spawned in {} ms", elapsed);
+    COCAINE_LOG_INFO(slave->log, "slave has been spawned in {} ms", elapsed);
 
     try {
         data.apply([&](data_t& data) {

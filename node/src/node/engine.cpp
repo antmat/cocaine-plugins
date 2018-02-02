@@ -165,9 +165,9 @@ auto engine_t::uptime() const -> std::chrono::seconds {
 auto engine_t::control_population(boost::optional<std::size_t> count) -> void {
     if (count) {
         count = std::max(std::size_t(0), *count);
-        COCAINE_LOG_DEBUG(log, "changed keep-alive slave count to {}", *count);
+        COCAINE_LOG_INFO(log, "changed keep-alive slave count to {}", *count);
     } else {
-        COCAINE_LOG_DEBUG(log, "changed keep-alive slave count to automatic");
+        COCAINE_LOG_INFO(log, "changed keep-alive slave count to automatic");
     }
 
     pool_target.apply([&](boost::optional<std::size_t>& pool_target) {

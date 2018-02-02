@@ -328,7 +328,7 @@ machine_t::shutdown(std::error_code ec) {
     }
 
     auto state = *this->state.synchronize();
-    COCAINE_LOG_DEBUG(log, "slave is shutting down from state {}: {}", state->name(), ec.message());
+    COCAINE_LOG_INFO(log, "slave is shutting down from state {}: {}", state->name(), ec.message());
 
     state->cancel();
     if (state->terminating()) {

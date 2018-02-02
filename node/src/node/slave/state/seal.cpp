@@ -42,14 +42,14 @@ auto seal_t::start(unsigned long timeout) -> void {
         return;
     }
 
-    COCAINE_LOG_DEBUG(slave->log, "slave is sealing, timeout: {} ms", timeout);
+    COCAINE_LOG_INFO(slave->log, "slave is sealing, timeout: {} ms", timeout);
 
     timer.expires_from_now(boost::posix_time::milliseconds(static_cast<std::int64_t>(timeout)));
     timer.async_wait(std::bind(&seal_t::on_timeout, shared_from_this(), ph::_1));
 }
 
 auto seal_t::terminate(const std::error_code& ec) -> void {
-    COCAINE_LOG_DEBUG(slave->log, "slave is terminating after been sealed: {}", ec.message());
+    COCAINE_LOG_INFO(slave->log, "slave is terminating after been sealed: {}", ec.message());
 
     cancel();
 
